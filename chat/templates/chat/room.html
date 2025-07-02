@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #chat-log {
+            list-style: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        #chat-log li {
+            margin: 5px 0;
+        }
+        #chat-message-input {
+            width: 70%;
+            padding: 5px;
+        }
+        #chat-message-submit {
+            padding: 6px 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Room: {{ room_name }}</h2>
+    <ul id="chat-log"></ul>
+    <input id="chat-message-input" type="text" autocomplete="off" placeholder="Type your message...">
+    <button id="chat-message-submit">Send</button>
+
+    <script>
+        const roomName = "{{ room_name }}";
+
+        // Prompt for sender name
+        let sender = prompt("Enter your name:", "UserA");
+        if (!sender || sender.trim() === "") {
+            sender = "Guest_" + Math.floor(Math.random() * 1000);
+        }
+
+        const socket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
+        );
+
+        socket.onopen = function() {
+            console.log("WebSocket connection established.");
+        };
+
+        socket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const chatLog = document.querySelector('#chat-log');
+            chatLog.innerHTML += `<li><strong>${data.sender}</strong>: ${data.message}</li>`;
+        };
+
+        socket.onclose = function(e) {
+            console.warn("WebSocket closed:", e);
+        };
+
+        socket.onerror = function(e) {
+            console.error("WebSocket error:", e);
+        };
+
+        document.querySelector('#chat-message-submit').onclick = function() {
+            const input = document.querySelector('#chat-message-input');
+            const message = input.value.trim();
+
+            if (message !== "") {
+                socket.send(JSON.stringify({
+                    'message': message,
+                    'sender': sender
+                }));
+                input.value = '';
+            }
+        };
+    </script>
+</body>
+</html>
