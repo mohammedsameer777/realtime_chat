@@ -9,9 +9,11 @@ from channels.layers import get_channel_layer
 from chat.models import ChatRequest, ChatMessage
 import re
 
+# ✅ Sanitize room name for WebSocket-safe format
 def sanitize_room_name(name):
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", name)[:99]
 
+# ✅ Room view showing previous messages
 @login_required
 def room(request, room_name):
     name = request.GET.get("name", request.user.username)
@@ -22,10 +24,12 @@ def room(request, room_name):
         "messages": messages
     })
 
+# ✅ Show chat request page
 @login_required
 def request_test_page(request):
     return render(request, "chat/requests.html")
 
+# ✅ Send chat request to another user
 @login_required
 @csrf_exempt
 def send_chat_request(request):
@@ -41,9 +45,23 @@ def send_chat_request(request):
         if ChatRequest.objects.filter(sender=sender, receiver=receiver, status='pending').exists():
             return JsonResponse({"error": "Request already sent"}, status=400)
 
-        ChatRequest.objects.create(sender=sender, receiver=receiver)
+        # ✅ Save ChatRequest to a variable
+        chat_request = ChatRequest.objects.create(sender=sender, receiver=receiver)
+
+        # ✅ Notify receiver in real-time via WebSocket
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{receiver.username}",
+            {
+                "type": "request.new",
+                "from_user": sender.username,
+                "request_id": chat_request.id,
+            }
+        )
+
         return JsonResponse({"success": "Chat request sent"})
 
+# ✅ List all incoming requests
 @require_GET
 @login_required
 def incoming_requests(request):
@@ -52,6 +70,7 @@ def incoming_requests(request):
     data = [{"id": r.id, "from": r.sender.username, "status": r.status} for r in requests]
     return JsonResponse({"requests": data})
 
+# ✅ Accept or reject chat request
 @login_required
 @csrf_exempt
 def respond_to_request(request):
@@ -69,6 +88,7 @@ def respond_to_request(request):
             chat_request.save()
             room_name = sanitize_room_name(f"{chat_request.sender.username}_{chat_request.receiver.username}")
 
+            # ✅ Notify sender to redirect
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"user_{chat_request.sender.username}",

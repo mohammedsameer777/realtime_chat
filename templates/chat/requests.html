@@ -31,25 +31,21 @@
   <ul id="incoming-list"></ul>
 
   <script>
-    // ✅ WebSocket connection for redirection notification
+    // ✅ WebSocket connection for real-time events
     const socket = new WebSocket('ws://' + window.location.host + '/ws/chat/test-requests/');
 
     socket.onmessage = function(e) {
       const data = JSON.parse(e.data);
 
       if (data.type === "redirect") {
-        // Redirect to chat room upon acceptance
+        // Redirect user1 when user2 accepts the request
         window.location.href = `/chat/${data.room}/`;
       }
+
       if (data.type === "request") {
-        // 🔁 Append new incoming request live
-        const li = document.createElement("li");
-        li.innerHTML = `
-          Request from <strong>${data.from}</strong>
-          <button onclick="respond(${data.request_id}, 'accept')">Accept</button>
-          <button onclick="respond(${data.request_id}, 'reject')">Reject</button>
-        `;
-        document.getElementById("incoming-list").appendChild(li);
+        // Handle incoming request in real time (user2 sees new request instantly)
+        alert("🔔 New chat request from: " + data.from);
+        loadRequests(); // Reload request list without refreshing page
       }
     };
 
@@ -89,7 +85,7 @@
       });
     }
 
-    // ✅ Accept/Reject a request
+    // ✅ Accept/Reject request
     async function respond(requestId, action) {
       const formData = new FormData();
       formData.append("request_id", requestId);
@@ -104,11 +100,11 @@
       const result = await response.json();
       alert(result.success || result.error);
 
-      if (result.room){
-
+      if (result.room) {
+        // Accepted — redirect to room
         window.location.href = `/chat/${result.room}/`;
-      }else{
-        loadRequests();
+      } else {
+        loadRequests(); // Refresh list on rejection
       }
     }
 
@@ -128,7 +124,7 @@
       return cookieValue;
     }
 
-    // ✅ Auto-load incoming requests on page load
+    // ✅ Load requests on page load
     window.onload = loadRequests;
   </script>
 </body>
