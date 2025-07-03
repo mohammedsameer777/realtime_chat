@@ -29,17 +29,24 @@
 </head>
 <body>
     <h2>Room: {{ room_name }}</h2>
-    <ul id="chat-log"></ul>
+
+    <!-- ✅ Show previously stored messages -->
+    <ul id="chat-log">
+        {% for msg in messages %}
+            <li><strong>{{ msg.sender.username }}</strong>: {{ msg.message }}</li>
+        {% endfor %}
+    </ul>
+
     <input id="chat-message-input" type="text" autocomplete="off" placeholder="Type your message...">
     <button id="chat-message-submit">Send</button>
 
     <script>
         const roomName = "{{ room_name }}";
 
-        // 🔥 Always prompt for a name
-        let sender = prompt("Enter your name:", "UserA");
+        // Ask for name only if not set via session (fallback)
+        let sender = "{{ username }}";
         if (!sender || sender.trim() === "") {
-            sender = "Guest_" + Math.floor(Math.random() * 1000);
+        sender = prompt("Enter your name:", "UserA") || "Guest_" + Math.floor(Math.random() * 1000);
         }
 
         const socket = new WebSocket(
@@ -47,14 +54,14 @@
         );
 
         socket.onopen = function() {
-            console.log("WebSocket connected");
+            console.log("✅ WebSocket connected");
         };
 
         socket.onmessage = function(e) {
             const data = JSON.parse(e.data);
             const chatLog = document.querySelector('#chat-log');
             chatLog.innerHTML += `<li><strong>${data.sender}</strong>: ${data.message}</li>`;
-            chatLog.scrollTop = chatLog.scrollHeight;  // auto scroll
+            chatLog.scrollTop = chatLog.scrollHeight;
         };
 
         socket.onerror = function(e) {

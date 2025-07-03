@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('chat/',include('chat.urls')),
     path('', lambda request: redirect('chat/testroom/')),
+    path('', include('auth_app.urls')), 
 ]

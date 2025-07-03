@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat Request Test</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    .requests {
+      margin-top: 20px;
+    }
+    .requests li {
+      margin-bottom: 10px;
+    }
+    input, button {
+      padding: 5px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔁 Send Chat Request</h2>
+
+  <label>Send to username:</label>
+  <input type="text" id="receiver" placeholder="e.g. user2" />
+  <button onclick="sendRequest()">Send Request</button>
+
+  <hr>
+  <h2>📥 Incoming Requests</h2>
+  <ul id="incoming-list"></ul>
+
+  <script>
+    // ✅ WebSocket connection for redirection notification
+    const socket = new WebSocket('ws://' + window.location.host + '/ws/chat/test-requests/');
+
+    socket.onmessage = function(e) {
+      const data = JSON.parse(e.data);
+
+      if (data.type === "redirect") {
+        // Redirect to chat room upon acceptance
+        window.location.href = `/chat/${data.room}/`;
+      }
+      if (data.type === "request") {
+        // 🔁 Append new incoming request live
+        const li = document.createElement("li");
+        li.innerHTML = `
+          Request from <strong>${data.from}</strong>
+          <button onclick="respond(${data.request_id}, 'accept')">Accept</button>
+          <button onclick="respond(${data.request_id}, 'reject')">Reject</button>
+        `;
+        document.getElementById("incoming-list").appendChild(li);
+      }
+    };
+
+    // ✅ Send a chat request
+    async function sendRequest() {
+      const receiver = document.getElementById("receiver").value;
+      const formData = new FormData();
+      formData.append("receiver", receiver);
+
+      const response = await fetch("/chat/send-request/", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        body: formData,
+      });
+
+      const result = await response.json();
+      alert(result.success || result.error);
+    }
+
+    // ✅ Load incoming requests
+    async function loadRequests() {
+      const response = await fetch("/chat/incoming-requests/");
+      const data = await response.json();
+      const list = document.getElementById("incoming-list");
+      list.innerHTML = "";
+
+      data.requests.forEach(req => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          Request from <strong>${req.from}</strong> (${req.status})
+          ${req.status === "pending" ? `
+            <button onclick="respond(${req.id}, 'accept')">Accept</button>
+            <button onclick="respond(${req.id}, 'reject')">Reject</button>
+          ` : ""}
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    // ✅ Accept/Reject a request
+    async function respond(requestId, action) {
+      const formData = new FormData();
+      formData.append("request_id", requestId);
+      formData.append("action", action);
+
+      const response = await fetch("/chat/respond-request/", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        body: formData,
+      });
+
+      const result = await response.json();
+      alert(result.success || result.error);
+
+      if (result.room){
+
+        window.location.href = `/chat/${result.room}/`;
+      }else{
+        loadRequests();
+      }
+    }
+
+    // ✅ CSRF helper
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== "") {
+        const cookies = document.cookie.split(";");
+        for (let cookie of cookies) {
+          cookie = cookie.trim();
+          if (cookie.startsWith(name + "=")) {
+            cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    // ✅ Auto-load incoming requests on page load
+    window.onload = loadRequests;
+  </script>
+</body>
+</html>
