@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Home</title>
+</head>
+<body>
+    <h2>Welcome {{ request.user.username }}</h2>
+    <a href="{% url 'logout' %}">Logout</a>
+
+    <h3>Online Users</h3>
+    <ul id="user-list">
+        {% for user in users %}
+            {% if user != request.user %}
+                <li>
+                    {{ user.username }}
+                    <button onclick="sendRequest('{{ user.id }}', '{{ user.username }}')">Chat</button>
+                </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+
+    <h3>Incoming Requests</h3>
+    <ul id="request-list"></ul>
+
+    <!-- Pass user info safely into JS -->
+    <script id="user-data" type="application/json">
+        {
+            "id": {{ request.user.id }},
+            "username": "{{ request.user.username }}"
+        }
+    </script>
+
+    <script>
+        const userData = JSON.parse(document.getElementById("user-data").textContent);
+        const userId = userData.id;
+        const username = userData.username;
+
+        const requestSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat_requests/' + userId + '/'
+        );
+
+        requestSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+
+            if (data.type === 'request') {
+                const item = document.createElement('li');
+                item.textContent = 'Chat request from ' + data.from_username;
+
+                const btn = document.createElement('button');
+                btn.textContent = 'Accept';
+                btn.onclick = function() {
+                    requestSocket.send(JSON.stringify({
+                        type: 'accept',
+                        sender_id: data.from_user,
+                        receiver_id: userId
+                    }));
+                };
+
+                item.appendChild(btn);
+                document.getElementById('request-list').appendChild(item);
+
+            } else if (data.type === 'redirect') {
+                window.location.href = '/chatroom/' + data.chat_id + '/';
+            }
+        };
+
+        function sendRequest(receiverId) {
+            requestSocket.send(JSON.stringify({
+                type: 'request',
+                sender_id: userId,
+                sender_username: username,
+                receiver_id: parseInt(receiverId)
+            }));
+        }
+    </script>
+</body>
+</html>

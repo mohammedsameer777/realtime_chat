@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chatroom</title>
+</head>
+<body>
+    <h2>Chatroom ID: {{ chat_id }}</h2>
+
+    <div id="chat-box" style="height:300px; overflow-y:scroll; border:1px solid #ccc;"></div>
+
+    <input type="text" id="message-input" placeholder="Type a message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <!-- Inject user data safely -->
+    <script id="user-id" type="application/json">{{ request.user.id }}</script>
+    <script id="username" type="application/json">"{{ request.user.username }}"</script>
+
+    <script>
+        const userId = JSON.parse(document.getElementById("user-id").textContent);
+        const username = JSON.parse(document.getElementById("username").textContent);
+        const chatId = "{{ chat_id }}";
+
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/' + chatId + '/'
+        );
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const chatBox = document.getElementById('chat-box');
+            const msg = document.createElement('p');
+            msg.textContent = `${data.sender}: ${data.message}`;
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value;
+            if (message) {
+                chatSocket.send(JSON.stringify({
+                    message: message,
+                    sender: username
+                }));
+                input.value = '';
+            }
+        }
+
+        // Load previous messages
+        fetch(`/messages/${chatId}/`)
+            .then(response => response.json())
+            .then(data => {
+                const chatBox = document.getElementById('chat-box');
+                data.forEach(msg => {
+                    const p = document.createElement('p');
+                    p.textContent = `${msg.sender}: ${msg.content}`;
+                    chatBox.appendChild(p);
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+    </script>
+</body>
+</html>
